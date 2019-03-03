@@ -1,0 +1,1 @@
+gcc -shared -Wl,-install_name, <LIBRARY_NAME> -o <LIBRARY_NAME>.so -fPIC <C_CODE_FILE_NAME>.c
