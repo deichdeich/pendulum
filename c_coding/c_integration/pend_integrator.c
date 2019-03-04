@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-
 #include <math.h>
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_blas.h>
@@ -26,15 +25,17 @@ int rkf78(double (*f)(double, gsl_vector *, gsl_vector *),
           double h);
 
 int _stepper(double (*f)(double, gsl_vector *, gsl_vector *),
-             double y[],
+             gsl_vector *in_state_vec,
+             gsl_vector *out_state_vec,
              double x,
              double h,
              double xmax,
              double *h_next,
-             double tolerance);
-
+             double tolerance );
+             
 double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
-                    double *y,
+                    gsl_vector *in_vec,
+                    gsl_vector *out_vec,
                     double x0,
                     double h);
 
@@ -44,6 +45,8 @@ int _populate_history(int hist_len,
                       int step,
                       double clock,
                       gsl_vector *state);
+
+int _arr2vec(int len, double in_arr[len], gsl_vector *out_vec);
 
 //////////////////////////////////////////////////////////////////////
 //     rk4: a fourth-order Runge-Kutta integrator for scalar ODE's 
@@ -132,11 +135,11 @@ int rkf78(double (*f)(double, gsl_vector *, gsl_vector *),
     gsl_vector *init_state_vec = gsl_vector_alloc(4);
     _arr2vec(4, init_state, init_state_vec);
     
-    gsl_vector *out_state_vec = gsl_vector_alloc(4)
+    gsl_vector *out_state_vec = gsl_vector_alloc(4);
     
     for (int i = 0; i < hist_len; i++){
         _stepper(f, init_state_vec, out_state_vec, x1, h, x2, &hpt, tol);
-        _populate_history(hist_len, history, step, x2, out_state_vec);
+        _populate_history(hist_len, history, i, x2, out_state_vec);
         x1 = x2;
         x2 += stepsize;
         gsl_vector_memcpy(init_state_vec, out_state_vec);
@@ -326,7 +329,7 @@ double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
     gsl_vector *k2_in = gsl_vector_alloc(4);
     gsl_vector *k3_in = gsl_vector_alloc(4);
     gsl_vector *k4_in = gsl_vector_alloc(4);
-    gsl_vector *k4_in = gsl_vector_alloc(4);
+    gsl_vector *k5_in = gsl_vector_alloc(4);
     gsl_vector *k6_in = gsl_vector_alloc(4);
     gsl_vector *k7_in = gsl_vector_alloc(4);
     gsl_vector *k8_in = gsl_vector_alloc(4);
@@ -339,7 +342,7 @@ double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
     gsl_vector *k2_out = gsl_vector_alloc(4);
     gsl_vector *k3_out = gsl_vector_alloc(4);
     gsl_vector *k4_out = gsl_vector_alloc(4);
-    gsl_vector *k4_out = gsl_vector_alloc(4);
+    gsl_vector *k5_out = gsl_vector_alloc(4);
     gsl_vector *k6_out = gsl_vector_alloc(4);
     gsl_vector *k7_out = gsl_vector_alloc(4);
     gsl_vector *k8_out = gsl_vector_alloc(4);
@@ -369,10 +372,12 @@ double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
     /////////////
     gsl_vector *k3k1_out = gsl_vector_alloc(4);
     gsl_vector *k3k2_out = gsl_vector_alloc(4);
-    gs_vector_memcpy(k3k1_out, k1_out);
-    gs_vector_memcpy(k3k2_out, k2_out);
-    k3_in = _vect_add(4, 2, gsl_blas_dscal(b31, k3k1_out),
-                            gsl_blas_dscal(b32, k3k2_out));
+    gsl_vector_memcpy(k3k1_out, k1_out);
+    gsl_vector_memcpy(k3k2_out, k2_out);
+    gsl_blas_dscal(b31, k3k1_out);
+    gsl_blas_dscal(b32, k3k2_out);
+    k3_in = _vect_add(4, 2, k3k1_out,
+                            k3k2_out);
     gsl_blas_dscal(h, k3_in);
     gsl_vector_add(k3_in, in_vec);
     
@@ -383,10 +388,12 @@ double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
     /////////////
     gsl_vector *k4k1_out = gsl_vector_alloc(4);
     gsl_vector *k4k3_out = gsl_vector_alloc(4);
-    gs_vector_memcpy(k4k1_out, k1_out);
-    gs_vector_memcpy(k4k3_out, k3_out);
-    k4_in = _vect_add(4, 2, gsl_blas_dscal(b41, k4k1_out),
-                            gsl_blas_dscal(b43, k4k3_out));
+    gsl_vector_memcpy(k4k1_out, k1_out);
+    gsl_vector_memcpy(k4k3_out, k3_out);
+    gsl_blas_dscal(b41, k4k1_out);
+    gsl_blas_dscal(b43, k4k3_out);
+    k4_in = _vect_add(4, 2, k4k1_out,
+                            k4k3_out);
     gsl_blas_dscal(h, k4_in);
     gsl_vector_add(k4_in, in_vec);
     
@@ -398,12 +405,15 @@ double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
     gsl_vector *k5k1_out = gsl_vector_alloc(4);
     gsl_vector *k5k3_out = gsl_vector_alloc(4);
     gsl_vector *k5k4_out = gsl_vector_alloc(4);
-    gs_vector_memcpy(k5k1_out, k1_out);
-    gs_vector_memcpy(k5k3_out, k3_out);
-    gs_vector_memcpy(k5k4_out, k4_out);
-    k5_in = _vect_add(4, 3, gsl_blas_dscal(b51, k5k1_out),
-                            gsl_blas_dscal(b53, k5k3_out),
-                            gsl_blas_dscal(b54, k5k4_out));
+    gsl_vector_memcpy(k5k1_out, k1_out);
+    gsl_vector_memcpy(k5k3_out, k3_out);
+    gsl_vector_memcpy(k5k4_out, k4_out);
+    gsl_blas_dscal(b51, k5k1_out);
+    gsl_blas_dscal(b53, k5k3_out);
+    gsl_blas_dscal(b54, k5k4_out);
+    k5_in = _vect_add(4, 3, k5k1_out,
+                            k5k3_out,
+                            k5k4_out);
     gsl_blas_dscal(h, k5_in);
     gsl_vector_add(k5_in, in_vec);    
     
@@ -415,12 +425,15 @@ double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
     gsl_vector *k6k1_out = gsl_vector_alloc(4);
     gsl_vector *k6k4_out = gsl_vector_alloc(4);
     gsl_vector *k6k5_out = gsl_vector_alloc(4);
-    gs_vector_memcpy(k6k1_out, k1_out);
-    gs_vector_memcpy(k6k4_out, k4_out);
-    gs_vector_memcpy(k6k5_out, k5_out);
-    k6_in = _vect_add(4, 3, gsl_blas_dscal(b61, k6k1_out),
-                            gsl_blas_dscal(b64, k6k4_out),
-                            gsl_blas_dscal(b65, k6k5_out));
+    gsl_vector_memcpy(k6k1_out, k1_out);
+    gsl_vector_memcpy(k6k4_out, k4_out);
+    gsl_vector_memcpy(k6k5_out, k5_out);
+    gsl_blas_dscal(b61, k6k1_out);
+    gsl_blas_dscal(b64, k6k4_out);
+    gsl_blas_dscal(b65, k6k5_out);
+    k6_in = _vect_add(4, 3, k6k1_out,
+                            k6k4_out,
+                            k6k5_out);
     gsl_blas_dscal(h, k6_in);
     gsl_vector_add(k6_in, in_vec);    
     
@@ -433,14 +446,18 @@ double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
     gsl_vector *k7k4_out = gsl_vector_alloc(4);
     gsl_vector *k7k5_out = gsl_vector_alloc(4);
     gsl_vector *k7k6_out = gsl_vector_alloc(4);
-    gs_vector_memcpy(k7k1_out, k1_out);
-    gs_vector_memcpy(k7k4_out, k4_out);
-    gs_vector_memcpy(k7k5_out, k5_out);
-    gs_vector_memcpy(k7k6_out, k6_out);
-    k7_in = _vect_add(4, 4, gsl_blas_dscal(b71, k7k1_out),
-                            gsl_blas_dscal(b74, k7k4_out),
-                            gsl_blas_dscal(b75, k7k5_out),
-                            gsl_blas_dscal(b76, k7k6_out));
+    gsl_vector_memcpy(k7k1_out, k1_out);
+    gsl_vector_memcpy(k7k4_out, k4_out);
+    gsl_vector_memcpy(k7k5_out, k5_out);
+    gsl_vector_memcpy(k7k6_out, k6_out);
+    gsl_blas_dscal(b71, k7k1_out);
+    gsl_blas_dscal(b74, k7k4_out);
+    gsl_blas_dscal(b75, k7k5_out);
+    gsl_blas_dscal(b76, k7k6_out);
+    k7_in = _vect_add(4, 4, k7k1_out,
+                            k7k4_out,
+                            k7k5_out,
+                            k7k6_out);
     gsl_blas_dscal(h, k7_in);
     gsl_vector_add(k7_in, in_vec);    
     
@@ -453,14 +470,18 @@ double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
     gsl_vector *k8k5_out = gsl_vector_alloc(4);
     gsl_vector *k8k6_out = gsl_vector_alloc(4);
     gsl_vector *k8k7_out = gsl_vector_alloc(4);
-    gs_vector_memcpy(k8k1_out, k1_out);
-    gs_vector_memcpy(k8k5_out, k5_out);
-    gs_vector_memcpy(k8k6_out, k6_out);
-    gs_vector_memcpy(k8k7_out, k7_out);
-    k8_in = _vect_add(4, 4, gsl_blas_dscal(b81, k8k1_out),
-                            gsl_blas_dscal(b85, k8k5_out),
-                            gsl_blas_dscal(b86, k8k6_out),
-                            gsl_blas_dscal(b87, k8k7_out));
+    gsl_vector_memcpy(k8k1_out, k1_out);
+    gsl_vector_memcpy(k8k5_out, k5_out);
+    gsl_vector_memcpy(k8k6_out, k6_out);
+    gsl_vector_memcpy(k8k7_out, k7_out);
+    gsl_blas_dscal(b81, k8k1_out);
+    gsl_blas_dscal(b85, k8k5_out);
+    gsl_blas_dscal(b86, k8k6_out);
+    gsl_blas_dscal(b87, k8k7_out);
+    k8_in = _vect_add(4, 4, k8k1_out,
+                            k8k5_out,
+                            k8k6_out,
+                            k8k7_out);
     gsl_blas_dscal(h, k8_in);
     gsl_vector_add(k8_in, in_vec);    
     
@@ -476,18 +497,24 @@ double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
     gsl_vector *k9k6_out = gsl_vector_alloc(4);
     gsl_vector *k9k7_out = gsl_vector_alloc(4);
     gsl_vector *k9k8_out = gsl_vector_alloc(4);
-    gs_vector_memcpy(k9k1_out, k1_out);
-    gs_vector_memcpy(k9k4_out, k4_out);
-    gs_vector_memcpy(k9k5_out, k5_out);
-    gs_vector_memcpy(k9k6_out, k6_out);
-    gs_vector_memcpy(k9k7_out, k7_out);
-    gs_vector_memcpy(k9k8_out, k8_out);
-    k9_in = _vect_add(4, 6, gsl_blas_dscal(b91, k9k1_out),
-                            gsl_blas_dscal(b94, k9k4_out),
-                            gsl_blas_dscal(b95, k9k5_out),
-                            gsl_blas_dscal(b96, k9k6_out),
-                            gsl_blas_dscal(b97, k9k7_out),
-                            gsl_blas_dscal(b98, k9k8_out));
+    gsl_vector_memcpy(k9k1_out, k1_out);
+    gsl_vector_memcpy(k9k4_out, k4_out);
+    gsl_vector_memcpy(k9k5_out, k5_out);
+    gsl_vector_memcpy(k9k6_out, k6_out);
+    gsl_vector_memcpy(k9k7_out, k7_out);
+    gsl_vector_memcpy(k9k8_out, k8_out);
+    gsl_blas_dscal(b91, k9k1_out);
+    gsl_blas_dscal(b94, k9k4_out);
+    gsl_blas_dscal(b95, k9k5_out);
+    gsl_blas_dscal(b96, k9k6_out);
+    gsl_blas_dscal(b97, k9k7_out);
+    gsl_blas_dscal(b98, k9k8_out);
+    k9_in = _vect_add(4, 6, k9k1_out,
+                            k9k4_out,
+                            k9k5_out,
+                            k9k6_out,
+                            k9k7_out,
+                            k9k8_out);
     gsl_blas_dscal(h, k9_in);
     gsl_vector_add(k9_in, in_vec);  
     (*f)(x0 + a9*h, k9_in, k9_out);
@@ -502,20 +529,27 @@ double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
     gsl_vector *k10k7_out = gsl_vector_alloc(4);
     gsl_vector *k10k8_out = gsl_vector_alloc(4);
     gsl_vector *k10k9_out = gsl_vector_alloc(4);
-    gs_vector_memcpy(k10k1_out, k1_out);
-    gs_vector_memcpy(k10k4_out, k4_out);
-    gs_vector_memcpy(k10k5_out, k5_out);
-    gs_vector_memcpy(k10k6_out, k6_out);
-    gs_vector_memcpy(k10k7_out, k7_out);
-    gs_vector_memcpy(k10k8_out, k8_out);
-    gs_vector_memcpy(k10k9_out, k9_out);
-    k10_in = _vect_add(4, 7, gsl_blas_dscal(b10_1, k10k1_out),
-                             gsl_blas_dscal(b10_4, k10k4_out),
-                             gsl_blas_dscal(b10_5, k10k5_out),
-                             gsl_blas_dscal(b10_6, k10k6_out),
-                             gsl_blas_dscal(b10_7, k10k7_out),
-                             gsl_blas_dscal(b10_8, k10k8_out),
-                             gsl_blas_dscal(b10_9, k10k9_out));
+    gsl_vector_memcpy(k10k1_out, k1_out);
+    gsl_vector_memcpy(k10k4_out, k4_out);
+    gsl_vector_memcpy(k10k5_out, k5_out);
+    gsl_vector_memcpy(k10k6_out, k6_out);
+    gsl_vector_memcpy(k10k7_out, k7_out);
+    gsl_vector_memcpy(k10k8_out, k8_out);
+    gsl_vector_memcpy(k10k9_out, k9_out);
+    gsl_blas_dscal(b10_1, k10k1_out);
+    gsl_blas_dscal(b10_4, k10k4_out);
+    gsl_blas_dscal(b10_5, k10k5_out);
+    gsl_blas_dscal(b10_6, k10k6_out);
+    gsl_blas_dscal(b10_7, k10k7_out);
+    gsl_blas_dscal(b10_8, k10k8_out);
+    gsl_blas_dscal(b10_9, k10k9_out);
+    k10_in = _vect_add(4, 7, k10k1_out,
+                             k10k4_out,
+                             k10k5_out,
+                             k10k6_out,
+                             k10k7_out,
+                             k10k8_out,
+                             k10k9_out);
     gsl_blas_dscal(h, k10_in);
     gsl_vector_add(k10_in, in_vec);  
     (*f)(x0 + a10*h, k10_in, k10_out);
@@ -531,22 +565,30 @@ double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
     gsl_vector *k11k8_out = gsl_vector_alloc(4);
     gsl_vector *k11k9_out = gsl_vector_alloc(4);
     gsl_vector *k11k10_out = gsl_vector_alloc(4);
-    gs_vector_memcpy(k11k1_out, k1_out);
-    gs_vector_memcpy(k11k4_out, k4_out);
-    gs_vector_memcpy(k11k5_out, k5_out);
-    gs_vector_memcpy(k11k6_out, k6_out);
-    gs_vector_memcpy(k11k7_out, k7_out);
-    gs_vector_memcpy(k11k8_out, k8_out);
-    gs_vector_memcpy(k11k9_out, k9_out);
-    gs_vector_memcpy(k11k10_out, k10_out);
-    k11_in = _vect_add(4, 8, gsl_blas_dscal(b11_1, k11k1_out),
-                             gsl_blas_dscal(b11_4, k11k4_out),
-                             gsl_blas_dscal(b11_5, k11k5_out),
-                             gsl_blas_dscal(b11_6, k11k6_out),
-                             gsl_blas_dscal(b11_7, k11k7_out),
-                             gsl_blas_dscal(b11_8, k11k8_out),
-                             gsl_blas_dscal(b11_9, k11k9_out),
-                             gsl_blas_dscal(b11_10, k11k10_out));
+    gsl_vector_memcpy(k11k1_out, k1_out);
+    gsl_vector_memcpy(k11k4_out, k4_out);
+    gsl_vector_memcpy(k11k5_out, k5_out);
+    gsl_vector_memcpy(k11k6_out, k6_out);
+    gsl_vector_memcpy(k11k7_out, k7_out);
+    gsl_vector_memcpy(k11k8_out, k8_out);
+    gsl_vector_memcpy(k11k9_out, k9_out);
+    gsl_vector_memcpy(k11k10_out, k10_out);
+    gsl_blas_dscal(b11_1, k11k1_out);
+    gsl_blas_dscal(b11_4, k11k4_out);
+    gsl_blas_dscal(b11_5, k11k5_out);
+    gsl_blas_dscal(b11_6, k11k6_out);
+    gsl_blas_dscal(b11_7, k11k7_out);
+    gsl_blas_dscal(b11_8, k11k8_out);
+    gsl_blas_dscal(b11_9, k11k9_out);
+    gsl_blas_dscal(b11_10, k11k10_out);
+    k11_in = _vect_add(4, 8, k11k1_out,
+                             k11k4_out,
+                             k11k5_out,
+                             k11k6_out,
+                             k11k7_out,
+                             k11k8_out,
+                             k11k9_out,
+                             k11k10_out);
     gsl_blas_dscal(h, k11_in);
     gsl_vector_add(k11_in, in_vec);  
     (*f)(x0 + h, k11_in, k11_out);
@@ -560,18 +602,24 @@ double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
     gsl_vector *k12k8_out = gsl_vector_alloc(4);
     gsl_vector *k12k9_out = gsl_vector_alloc(4);
     gsl_vector *k12k10_out = gsl_vector_alloc(4);
-    gs_vector_memcpy(k12k1_out, k1_out);
-    gs_vector_memcpy(k12k6_out, k6_out);
-    gs_vector_memcpy(k12k7_out, k7_out);
-    gs_vector_memcpy(k12k8_out, k8_out);
-    gs_vector_memcpy(k12k9_out, k9_out);
-    gs_vector_memcpy(k12k10_out, k10_out);
-    k12_in = _vect_add(4, 6, gsl_blas_dscal(b12_1, k12k1_out),
-                             gsl_blas_dscal(b12_6, k12k6_out),
-                             gsl_blas_dscal(b12_7, k12k7_out),
-                             gsl_blas_dscal(b12_8, k12k8_out),
-                             gsl_blas_dscal(b12_9, k12k9_out),
-                             gsl_blas_dscal(b12_10, k12k10_out));
+    gsl_vector_memcpy(k12k1_out, k1_out);
+    gsl_vector_memcpy(k12k6_out, k6_out);
+    gsl_vector_memcpy(k12k7_out, k7_out);
+    gsl_vector_memcpy(k12k8_out, k8_out);
+    gsl_vector_memcpy(k12k9_out, k9_out);
+    gsl_vector_memcpy(k12k10_out, k10_out);
+    gsl_blas_dscal(b12_1, k12k1_out);
+    gsl_blas_dscal(b12_6, k12k6_out);
+    gsl_blas_dscal(b12_7, k12k7_out);
+    gsl_blas_dscal(b12_8, k12k8_out);
+    gsl_blas_dscal(b12_9, k12k9_out);
+    gsl_blas_dscal(b12_10, k12k10_out);
+    k12_in = _vect_add(4, 6, k12k1_out,
+                             k12k6_out,
+                             k12k7_out,
+                             k12k8_out,
+                             k12k9_out,
+                             k12k10_out);
     gsl_blas_dscal(h, k12_in);
     gsl_vector_add(k12_in, in_vec); 
                            
@@ -589,24 +637,32 @@ double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
     gsl_vector *k13k9_out = gsl_vector_alloc(4);
     gsl_vector *k13k10_out = gsl_vector_alloc(4);
     gsl_vector *k13k12_out = gsl_vector_alloc(4);
-    gs_vector_memcpy(k13k1_out, k1_out);
-    gs_vector_memcpy(k13k4_out, k4_out);
-    gs_vector_memcpy(k13k5_out, k5_out);
-    gs_vector_memcpy(k13k6_out, k6_out);
-    gs_vector_memcpy(k13k7_out, k7_out);
-    gs_vector_memcpy(k13k8_out, k8_out);
-    gs_vector_memcpy(k13k9_out, k9_out);
-    gs_vector_memcpy(k13k10_out, k10_out);
-    gs_vector_memcpy(k13k12_out, k12_out);
-    k13_in = _vect_add(4, 9, gsl_blas_dscal(b13_1, k13k1_out),
-                             gsl_blas_dscal(b13_4, k13k4_out),
-                             gsl_blas_dscal(b13_5, k13k5_out),
-                             gsl_blas_dscal(b13_6, k13k6_out),
-                             gsl_blas_dscal(b13_7, k13k7_out),
-                             gsl_blas_dscal(b13_8, k13k8_out),
-                             gsl_blas_dscal(b13_9, k13k9_out),
-                             gsl_blas_dscal(b13_10, k13k10_out),
-                             gsl_blas_dscal(b13_12, k13k12_out));
+    gsl_vector_memcpy(k13k1_out, k1_out);
+    gsl_vector_memcpy(k13k4_out, k4_out);
+    gsl_vector_memcpy(k13k5_out, k5_out);
+    gsl_vector_memcpy(k13k6_out, k6_out);
+    gsl_vector_memcpy(k13k7_out, k7_out);
+    gsl_vector_memcpy(k13k8_out, k8_out);
+    gsl_vector_memcpy(k13k9_out, k9_out);
+    gsl_vector_memcpy(k13k10_out, k10_out);
+    gsl_vector_memcpy(k13k12_out, k12_out);
+    gsl_blas_dscal(b13_1, k13k1_out);
+    gsl_blas_dscal(b13_4, k13k4_out);
+    gsl_blas_dscal(b13_5, k13k5_out);
+    gsl_blas_dscal(b13_6, k13k6_out);
+    gsl_blas_dscal(b13_7, k13k7_out);
+    gsl_blas_dscal(b13_8, k13k8_out);
+    gsl_blas_dscal(b13_9, k13k9_out);
+    gsl_blas_dscal(b13_10, k13k10_out);
+    k13_in = _vect_add(4, 9, k13k1_out,
+                             k13k4_out,
+                             k13k5_out,
+                             k13k6_out,
+                             k13k7_out,
+                             k13k8_out,
+                             k13k9_out,
+                             k13k10_out,
+                             k13k12_out);
     gsl_blas_dscal(h, k13_in);
     gsl_vector_add(k13_in, in_vec); 
                            
@@ -615,21 +671,24 @@ double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
     //////////////
     // out_vec
     /////////////
-    gsl_vector *c_1_11_vec;
-    gsl_vector *c_6_vec;
-    gsl_vector *c_7_8_vec;
-    gsl_vector *c_9_10_vec;
-    gsl_vector *c_tot_vec;
+    gsl_vector *c_1_11_vec = gsl_vector_alloc(4);
+    gsl_vector *c_6_vec = gsl_vector_alloc(4);
+    gsl_vector *c_7_8_vec = gsl_vector_alloc(4);
+    gsl_vector *c_9_10_vec = gsl_vector_alloc(4);
+    gsl_vector *c_tot_vec = gsl_vector_alloc(4);
     
     c_1_11_vec = _vect_add(4, 2, k1_out, k11_out);
     gsl_vector_memcpy(c_6_vec, k6_out);
     c_7_8_vec = _vect_add(4, 2, k7_out, k8_out);
     c_9_10_vec = _vect_add(4, 2, k9_out, k10_out);
-    
-    c_tot_vec = _vect_add(4, 4, gsl_blas_dscal(c_1_11, c_1_11_vec),
-                                gsl_blas_dscal(c_6, c_6_vec),
-                                gsl_blas_dscal(c_7_8, c_7_8_vec),
-                                gsl_blas_dscal(c_9_10, c_9_10_vec));
+    gsl_blas_dscal(c_1_11, c_1_11_vec);
+    gsl_blas_dscal(c6, c_6_vec);
+    gsl_blas_dscal(c_7_8, c_7_8_vec);
+    gsl_blas_dscal(c_9_10, c_9_10_vec);
+    c_tot_vec = _vect_add(4, 4, c_1_11_vec,
+                                c_6_vec,
+                                c_7_8_vec,
+                                c_9_10_vec);
     
     gsl_blas_dscal(h, c_tot_vec);
     gsl_vector_add(c_tot_vec, in_vec);
@@ -638,9 +697,9 @@ double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
     //////////////
     // err_factor
     /////////////
-    gsl_vector *err_vec;
-    gsl_vector *ek12;
-    gsl_vector *ek13;
+    gsl_vector *err_vec = gsl_vector_alloc(4);
+    gsl_vector *ek12 = gsl_vector_alloc(4);
+    gsl_vector *ek13 = gsl_vector_alloc(4);
     
     gsl_vector_memcpy(ek12, k12_out);
     gsl_vector_memcpy(ek13, k13_out);
@@ -667,20 +726,20 @@ int double_pendulum_eom(double t, gsl_vector *in_state, gsl_vector *out_state){
     a1 = GRAVITY*(sin(Th2) * cos(Th1 - Th2) - 2*sin(Th1));
     a2 = -(Th2_d*Th2_d + Th1_d*Th1_d*cos(Th1 - Th2));
     a3 = sin(Th1 - Th2);
-    a4 = (2-np.cos(Th1 - Th2) * cos(Th1 - Th2));
+    a4 = (2-cos(Th1 - Th2) * cos(Th1 - Th2));
     Th1_dd = (a1 + (a2 * a3))/a4;
 
     b1 = 2*GRAVITY*(sin(Th1) * cos(Th1 - Th2) - sin(Th2));
     b2 = 2*Th1_d*Th1_d + Th2_d*Th2_d * cos(Th1 - Th2);
-    b3 = sin(Th_1 - Th_2);
-    b4 = (2-np.cos(Th1 - Th2)*cos(Th1 - Th2));
+    b3 = sin(Th1 - Th2);
+    b4 = (2-cos(Th1 - Th2)*cos(Th1 - Th2));
     
-    Th_dd_2 = (b1 + (b2 * b3))/b4;
+    Th2_dd = (b1 + (b2 * b3))/b4;
     
     gsl_vector_set(out_state, 0, Th1);
-    gsl_vector_set(out_state, 0, Th1_d);
-    gsl_vector_set(out_state, 0, Th2);
-    gsl_vector_set(out_state, 0, Th2_d);
+    gsl_vector_set(out_state, 1, Th1_d);
+    gsl_vector_set(out_state, 2, Th2);
+    gsl_vector_set(out_state, 3, Th2_d);
     
     return 0;
 }
@@ -727,7 +786,7 @@ int _populate_history(int hist_len,
 
 int _arr2vec(int len, double in_arr[len], gsl_vector *out_vec){
     for (int i = 0; i < len; i++){
-        gsl_vector_set(out_vec, i, in_arr[i])
+        gsl_vector_set(out_vec, i, in_arr[i]);
         }
     return 0;
 }
