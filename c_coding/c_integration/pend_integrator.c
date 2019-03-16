@@ -13,7 +13,7 @@
 #define MIN_SCALE_FACTOR 0.125
 #define MAX_SCALE_FACTOR 4.
 
-#define GRAVITY 10.
+#define GRAVITY 9.8
 
 int rkf78(double (*f)(double, gsl_vector *, gsl_vector *),
           double xmin,
@@ -47,6 +47,8 @@ int _populate_history(int hist_len,
                       gsl_vector *state);
 
 int _arr2vec(int len, double in_arr[len], gsl_vector *out_vec);
+
+
 
 //////////////////////////////////////////////////////////////////////
 //     rk4: a fourth-order Runge-Kutta integrator for scalar ODE's 
@@ -145,7 +147,6 @@ int rkf78(double (*f)(double, gsl_vector *, gsl_vector *),
         gsl_vector_memcpy(init_state_vec, out_state_vec);
     }
     return 0;
-
 }
 
 int _stepper(double (*f)(double, gsl_vector *, gsl_vector *),
@@ -707,7 +708,10 @@ double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
     gsl_blas_dscal(-1, ek13);
     
     err_vec = _vect_add(4, 4, k1_out, k11_out, ek12, ek13);   
-                        
+    
+    
+    
+    
     return err_factor * gsl_blas_dnrm2(err_vec);
 }
 
@@ -736,10 +740,10 @@ int double_pendulum_eom(double t, gsl_vector *in_state, gsl_vector *out_state){
     
     Th2_dd = (b1 + (b2 * b3))/b4;
     
-    gsl_vector_set(out_state, 0, Th1);
-    gsl_vector_set(out_state, 1, Th1_d);
-    gsl_vector_set(out_state, 2, Th2);
-    gsl_vector_set(out_state, 3, Th2_d);
+    gsl_vector_set(out_state, 0, Th1_d);
+    gsl_vector_set(out_state, 1, Th1_dd);
+    gsl_vector_set(out_state, 2, Th2_d);
+    gsl_vector_set(out_state, 3, Th2_dd);
     
     return 0;
 }
