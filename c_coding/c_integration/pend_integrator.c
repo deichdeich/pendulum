@@ -39,7 +39,7 @@ double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
                     double x0,
                     double h);
 
-gsl_vector *_vect_add(int vect_len, int count, ...);
+int *_vect_add(gsl_vector * sum, int vect_len, int count, ...);
 int _populate_history(int hist_len,
                       double history[hist_len][5],
                       int step,
@@ -48,8 +48,115 @@ int _populate_history(int hist_len,
 
 int _arr2vec(int len, double in_arr[len], gsl_vector *out_vec);
 
+static struct {
+    gsl_vector *k1_in;
+    gsl_vector *k2_in;
+    gsl_vector *k3_in;
+    gsl_vector *k4_in;
+    gsl_vector *k5_in;
+    gsl_vector *k6_in;
+    gsl_vector *k7_in;
+    gsl_vector *k8_in;
+    gsl_vector *k9_in;
+    gsl_vector *k10_in;
+    gsl_vector *k11_in;
+    gsl_vector *k12_in;
+    gsl_vector *k13_in;
+    gsl_vector *k1_out;
+    gsl_vector *k2_out;
+    gsl_vector *k3_out;
+    gsl_vector *k4_out;
+    gsl_vector *k5_out;
+    gsl_vector *k6_out;
+    gsl_vector *k7_out;
+    gsl_vector *k8_out;
+    gsl_vector *k9_out;
+    gsl_vector *k10_out;
+    gsl_vector *k11_out;
+    gsl_vector *k12_out;
+    gsl_vector *k13_out;
+    
+    gsl_vector *k3k1_out;
+    gsl_vector *k3k2_out;
+    
+    gsl_vector *k4k1_out;
+    gsl_vector *k4k3_out;
+    
+    gsl_vector *k5k1_out;
+    gsl_vector *k5k3_out;
+    gsl_vector *k5k4_out;
+    
+    gsl_vector *k6k1_out;
+    gsl_vector *k6k4_out;
+    gsl_vector *k6k5_out;
 
+    gsl_vector *k7k1_out;
+    gsl_vector *k7k4_out;
+    gsl_vector *k7k5_out;
+    gsl_vector *k7k6_out;
 
+    gsl_vector *k8k1_out;
+    gsl_vector *k8k5_out;
+    gsl_vector *k8k6_out;
+    gsl_vector *k8k7_out;
+
+    gsl_vector *k9k1_out;
+    gsl_vector *k9k4_out;
+    gsl_vector *k9k5_out;
+    gsl_vector *k9k6_out;
+    gsl_vector *k9k7_out;
+    gsl_vector *k9k8_out;
+
+    gsl_vector *k10k1_out;
+    gsl_vector *k10k4_out;
+    gsl_vector *k10k5_out;
+    gsl_vector *k10k6_out;
+    gsl_vector *k10k7_out;
+    gsl_vector *k10k8_out;
+    gsl_vector *k10k9_out;
+
+    gsl_vector *k11k1_out;
+    gsl_vector *k11k4_out;
+    gsl_vector *k11k5_out;
+    gsl_vector *k11k6_out;
+    gsl_vector *k11k7_out;
+    gsl_vector *k11k8_out;
+    gsl_vector *k11k9_out;
+    gsl_vector *k11k10_out;
+
+    gsl_vector *k12k1_out;
+    gsl_vector *k12k6_out;
+    gsl_vector *k12k7_out;
+    gsl_vector *k12k8_out;
+    gsl_vector *k12k9_out;
+    gsl_vector *k12k10_out;    
+
+    gsl_vector *k13k1_out;
+    gsl_vector *k13k4_out;
+    gsl_vector *k13k5_out;
+    gsl_vector *k13k6_out;
+    gsl_vector *k13k7_out;
+    gsl_vector *k13k8_out;
+    gsl_vector *k13k9_out;
+    gsl_vector *k13k10_out;
+    gsl_vector *k13k12_out;
+
+    gsl_vector *c_1_11_vec;
+    gsl_vector *c_6_vec;
+    gsl_vector *c_7_8_vec;
+    gsl_vector *c_9_10_vec;
+    gsl_vector *c_tot_vec;
+
+    gsl_vector *err_vec;
+    gsl_vector *ek12;
+    gsl_vector *ek13;
+    
+    gsl_vector *temp_in_vec;
+    gsl_vector *temp_out_vec;
+    
+} integration_vectors;
+
+static int init_count = 0;
 //////////////////////////////////////////////////////////////////////
 //     rk4: a fourth-order Runge-Kutta integrator for scalar ODE's 
 //
@@ -63,6 +170,36 @@ int _arr2vec(int len, double in_arr[len], gsl_vector *out_vec);
 //
 //
 /////////////////////////////////////////////////////////////////////
+void integration_vector_init(){
+    init_count+=1;
+    int i, Nelt;
+    gsl_vector **p;
+
+    Nelt = sizeof(integration_vectors) / sizeof(integration_vectors.k1_in);    // number of elements in x.
+
+    p = &integration_vectors.k1_in;                          // p is pointer to x.a1, hence
+                                           // p[0] points to same as x.a1;
+                                           // p[1] points to same as x.a2; etc.
+    for (i=0 ; i < Nelt ; i++, p++) {
+        *p = gsl_vector_calloc(4);
+        }
+}
+
+
+void integration_vector_free(){
+    int i, Nelt;
+    gsl_vector **p;
+
+    Nelt = sizeof(integration_vectors) / sizeof(integration_vectors.k1_in);    // number of elements in x.
+
+    p = &integration_vectors.k1_in;                          // p is pointer to x.a1, hence
+                                           // p[0] points to same as x.a1;
+                                           // p[1] points to same as x.a2; etc.
+    for (i=0 ; i < Nelt ; i++, p++) {
+        gsl_vector_free(*p);
+        }
+}
+
 int * rk4(double t0,
           double (*f)(double, double),
           int N,
@@ -105,7 +242,12 @@ int * rk4(double t0,
     }
     return 0;
 }
-
+void print_vec(gsl_vector * vec){
+    for (int i = 0; i < 4; i++){
+        //printf("%f, ", gsl_vector_get(vec, i));
+    }
+    //printf("\n");
+}
 ////////////////////////////////////////////////////////////////////
 //  rkf78: an embedded Runge-Kutta-Felberg method
 //
@@ -127,25 +269,39 @@ int rkf78(double (*f)(double, gsl_vector *, gsl_vector *),
           double history[hist_len][5],
           double tol,
           double h){
-    
     double stepsize = (xmax - xmin) / hist_len;
     double hpt;
     
     double x1 = xmin;
     double x2 = xmin + stepsize;
-    
-    gsl_vector *init_state_vec = gsl_vector_alloc(4);
+
+
+    gsl_vector *init_state_vec = gsl_vector_calloc(4);
     _arr2vec(4, init_state, init_state_vec);
-    
-    gsl_vector *out_state_vec = gsl_vector_alloc(4);
-    
+            //printf("0 in: ");
+        //print_vec(init_state_vec);
+
+    gsl_vector *out_state_vec = gsl_vector_calloc(4);
+            //printf("0 out: ");
+        //print_vec(out_state_vec);
     for (int i = 0; i < hist_len; i++){
+        //printf("1 in: ");
+        //print_vec(init_state_vec);
+        //printf("1 out: ");
+        //print_vec(out_state_vec);
         _stepper(f, init_state_vec, out_state_vec, x1, h, x2, &hpt, tol);
+        //printf("2 in: ");
+        //print_vec(init_state_vec);
+        //printf("2 out: ");
+        //print_vec(out_state_vec);
         _populate_history(hist_len, history, i, x2, out_state_vec);
         x1 = x2;
         x2 += stepsize;
         gsl_vector_memcpy(init_state_vec, out_state_vec);
+
     }
+    ////printf("%d\n", init_count);    
+
     return 0;
 }
 
@@ -158,11 +314,11 @@ int _stepper(double (*f)(double, gsl_vector *, gsl_vector *),
              double *h_next,
              double tolerance ){
 
+  
+    integration_vector_init();
    static const double err_exponent = 1.0 / 7.0;
-
+    
    double scale;
-   gsl_vector *temp_in_vec = gsl_vector_alloc(4);
-   gsl_vector *temp_out_vec = gsl_vector_alloc(4);
    double err;
    double yy;
    int i;
@@ -178,7 +334,15 @@ int _stepper(double (*f)(double, gsl_vector *, gsl_vector *),
        // dependent variable and return success.                            //
 
    *h_next = h;
+        //printf("3 in: ");
+        //print_vec(in_state_vec);
+        //printf("3 out: ");
+        //print_vec(out_state_vec);
    gsl_vector_memcpy(out_state_vec, in_state_vec);
+        //printf("4 in: ");
+        //print_vec(in_state_vec);
+        //printf("4 out: ");
+        //print_vec(out_state_vec);
    if (xmax == x) return 0; 
 
        // Insure that the step size h is not larger than the length of the //
@@ -195,54 +359,75 @@ int _stepper(double (*f)(double, gsl_vector *, gsl_vector *),
         // maintain an error less than tolerance * (xmax-x) using an     //
         // initial step size of h and initial value: y = y[0]            //
 
-   gsl_vector_memcpy(temp_in_vec, in_state_vec);
+   gsl_vector_memcpy(integration_vectors.temp_in_vec, in_state_vec);
+
    while ( x < xmax ) {
       scale = 1.0;
       for (i = 0; i < ATTEMPTS; i++) {
-         
+        //printf("5 in: ");
+        //print_vec(integration_vectors.temp_in_vec);
+        //printf("5 out: ");
+        //print_vec(integration_vectors.temp_out_vec);
          err = fabs(_single_step(f,
-                                 temp_in_vec,
-                                 temp_out_vec,
+                                 integration_vectors.temp_in_vec,
+                                 integration_vectors.temp_out_vec,
                                  x,
                                  h));
-         
+        //printf("6 in: ");
+        //print_vec(integration_vectors.temp_in_vec);
+        //printf("6 out: ");
+        //print_vec(integration_vectors.temp_out_vec);
          if (err == 0.0) {
+
          scale = MAX_SCALE_FACTOR;
          break;
          }
-         
-         double statenorm = gsl_blas_dnrm2(temp_in_vec);
+
+         double statenorm = gsl_blas_dnrm2(integration_vectors.temp_in_vec);
          
          yy = (statenorm == 0.0) ? tolerance : statenorm;
          
+         
+
+         
          scale = 0.8 * pow( tolerance * yy /  err , err_exponent );
          scale = min( max(scale,MIN_SCALE_FACTOR), MAX_SCALE_FACTOR);
-         
+
          if ( err < ( tolerance * yy ) ) break;
-         
+
          h *= scale;
-         
+
          if ( x + h > xmax ) h = xmax - x;
-         
+
          else if ( x + h + 0.5 * h > xmax ) h = 0.5 * h;
-      }
+
+      
       if ( i >= ATTEMPTS ) {
             *h_next = h * scale;
             return -1;
             }
-      
-      gsl_vector_memcpy(temp_in_vec, temp_out_vec);
+    }
+        //printf("temp_in_vec: ");
+        //print_vec(integration_vectors.temp_in_vec);
+      gsl_vector_memcpy(integration_vectors.temp_in_vec,
+                        integration_vectors.temp_out_vec);
       x += h;
       h *= scale;
       *h_next = h;
-      
-      if ( last_interval ) break;
-      
+
+      if ( last_interval ) {
+
+      break;
+      }
+
       if (  x + h > xmax ) { last_interval = 1; h = xmax - x; }
       
       else if ( x + h + 0.5 * h > xmax ) h = 0.5 * h;
    }
-   gsl_vector_memcpy(out_state_vec, temp_out_vec);
+   gsl_vector_memcpy(out_state_vec, integration_vectors.temp_out_vec);
+   integration_vector_free();
+   //printf("out_state_vec:");
+    //print_vec(out_state_vec);
    return 0;
 }
 
@@ -253,7 +438,10 @@ double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
                     gsl_vector *out_vec,
                     double x0,
                     double h){
-
+        //printf("7 in: ");
+        //print_vec(in_vec);
+        //printf("7 out: ");
+        //print_vec(out_vec);
     const double c_1_11 = 41.0 / 840.0;
     const double c6 = 34.0 / 105.0;
     const double c_7_8= 9.0 / 35.0;
@@ -325,394 +513,323 @@ double _single_step(double (*f)(double, gsl_vector *, gsl_vector *),
 
     const double err_factor  = -41.0 / 840.0;
     double h2_7 = a2 * h;
-
-    gsl_vector *k1_in = gsl_vector_alloc(4);
-    gsl_vector *k2_in = gsl_vector_alloc(4);
-    gsl_vector *k3_in = gsl_vector_alloc(4);
-    gsl_vector *k4_in = gsl_vector_alloc(4);
-    gsl_vector *k5_in = gsl_vector_alloc(4);
-    gsl_vector *k6_in = gsl_vector_alloc(4);
-    gsl_vector *k7_in = gsl_vector_alloc(4);
-    gsl_vector *k8_in = gsl_vector_alloc(4);
-    gsl_vector *k9_in = gsl_vector_alloc(4);
-    gsl_vector *k10_in = gsl_vector_alloc(4);
-    gsl_vector *k11_in = gsl_vector_alloc(4);
-    gsl_vector *k12_in = gsl_vector_alloc(4);
-    gsl_vector *k13_in = gsl_vector_alloc(4);
-    gsl_vector *k1_out = gsl_vector_alloc(4);
-    gsl_vector *k2_out = gsl_vector_alloc(4);
-    gsl_vector *k3_out = gsl_vector_alloc(4);
-    gsl_vector *k4_out = gsl_vector_alloc(4);
-    gsl_vector *k5_out = gsl_vector_alloc(4);
-    gsl_vector *k6_out = gsl_vector_alloc(4);
-    gsl_vector *k7_out = gsl_vector_alloc(4);
-    gsl_vector *k8_out = gsl_vector_alloc(4);
-    gsl_vector *k9_out = gsl_vector_alloc(4);
-    gsl_vector *k10_out = gsl_vector_alloc(4);
-    gsl_vector *k11_out = gsl_vector_alloc(4);
-    gsl_vector *k12_out = gsl_vector_alloc(4);
-    gsl_vector *k13_out = gsl_vector_alloc(4);
     
     //////////////
     // k1
     /////////////
-    gsl_vector_memcpy(k1_in, in_vec);
-    (*f)(x0, k1_in, k1_out);
+    gsl_vector_memcpy(integration_vectors.k1_in, in_vec);
+    (*f)(x0, integration_vectors.k1_in, integration_vectors.k1_out);
 
     //////////////
     // k2
     ///////////// 
-    gsl_vector_memcpy(k2_in, k1_out);
-    gsl_blas_dscal(h2_7, k2_in);
-    gsl_vector_add(k2_in, in_vec);
+    gsl_vector_memcpy(integration_vectors.k2_in,
+                      integration_vectors.k1_out);
+    gsl_blas_dscal(h2_7, integration_vectors.k2_in);
+    gsl_vector_add(integration_vectors.k2_in, in_vec);
     
-    (*f)(x0 + h2_7, k2_in, k2_out);
+    (*f)(x0 + h2_7, integration_vectors.k2_in,
+                    integration_vectors.k2_out);
+    //printf("k2: ");
+    //print_vec(integration_vectors.k2_out);
 
     //////////////
     // k3
     /////////////
-    gsl_vector *k3k1_out = gsl_vector_alloc(4);
-    gsl_vector *k3k2_out = gsl_vector_alloc(4);
-    gsl_vector_memcpy(k3k1_out, k1_out);
-    gsl_vector_memcpy(k3k2_out, k2_out);
-    gsl_blas_dscal(b31, k3k1_out);
-    gsl_blas_dscal(b32, k3k2_out);
-    k3_in = _vect_add(4, 2, k3k1_out,
-                            k3k2_out);
-    gsl_blas_dscal(h, k3_in);
-    gsl_vector_add(k3_in, in_vec);
+    gsl_vector_memcpy(integration_vectors.k3k1_out, integration_vectors.k1_out);
+    gsl_vector_memcpy(integration_vectors.k3k2_out, integration_vectors.k2_out);
+    gsl_blas_dscal(b31, integration_vectors.k3k1_out);
+    gsl_blas_dscal(b32, integration_vectors.k3k2_out);
+    _vect_add(integration_vectors.k3_in, 4, 2, integration_vectors.k3k1_out,
+                                               integration_vectors.k3k2_out);
+    gsl_blas_dscal(h, integration_vectors.k3_in);
+    gsl_vector_add(integration_vectors.k3_in, in_vec);
     
-    (*f)(x0 + a3*h, k3_in, k3_out);
-
-    //////////////
+    (*f)(x0 + a3*h, integration_vectors.k3_in, integration_vectors.k3_out);
+    //printf("k3: ");
+    //print_vec(integration_vectors.k3_out);    //////////////
     // k4
     /////////////
-    gsl_vector *k4k1_out = gsl_vector_alloc(4);
-    gsl_vector *k4k3_out = gsl_vector_alloc(4);
-    gsl_vector_memcpy(k4k1_out, k1_out);
-    gsl_vector_memcpy(k4k3_out, k3_out);
-    gsl_blas_dscal(b41, k4k1_out);
-    gsl_blas_dscal(b43, k4k3_out);
-    k4_in = _vect_add(4, 2, k4k1_out,
-                            k4k3_out);
-    gsl_blas_dscal(h, k4_in);
-    gsl_vector_add(k4_in, in_vec);
+    gsl_vector_memcpy(integration_vectors.k4k1_out, integration_vectors.k1_out);
+    gsl_vector_memcpy(integration_vectors.k4k3_out, integration_vectors.k3_out);
+    gsl_blas_dscal(b41, integration_vectors.k4k1_out);
+    gsl_blas_dscal(b43, integration_vectors.k4k3_out);
+    _vect_add(integration_vectors.k4_in, 4, 2, integration_vectors.k4k1_out,
+                                               integration_vectors.k4k3_out);
+    gsl_blas_dscal(h, integration_vectors.k4_in);
+    gsl_vector_add(integration_vectors.k4_in, in_vec);
     
-    (*f)(x0 + a4*h, k4_in, k4_out);
-
-    //////////////
+    (*f)(x0 + a4*h, integration_vectors.k4_in, integration_vectors.k4_out);
+    //printf("k4: ");
+    //print_vec(integration_vectors.k4_out);    //////////////
     // k5
     /////////////
-    gsl_vector *k5k1_out = gsl_vector_alloc(4);
-    gsl_vector *k5k3_out = gsl_vector_alloc(4);
-    gsl_vector *k5k4_out = gsl_vector_alloc(4);
-    gsl_vector_memcpy(k5k1_out, k1_out);
-    gsl_vector_memcpy(k5k3_out, k3_out);
-    gsl_vector_memcpy(k5k4_out, k4_out);
-    gsl_blas_dscal(b51, k5k1_out);
-    gsl_blas_dscal(b53, k5k3_out);
-    gsl_blas_dscal(b54, k5k4_out);
-    k5_in = _vect_add(4, 3, k5k1_out,
-                            k5k3_out,
-                            k5k4_out);
-    gsl_blas_dscal(h, k5_in);
-    gsl_vector_add(k5_in, in_vec);    
+    gsl_vector_memcpy(integration_vectors.k5k1_out, integration_vectors.k1_out);
+    gsl_vector_memcpy(integration_vectors.k5k3_out, integration_vectors.k3_out);
+    gsl_vector_memcpy(integration_vectors.k5k4_out, integration_vectors.k4_out);
+    gsl_blas_dscal(b51, integration_vectors.k5k1_out);
+    gsl_blas_dscal(b53, integration_vectors.k5k3_out);
+    gsl_blas_dscal(b54, integration_vectors.k5k4_out);
+    _vect_add(integration_vectors.k5_in, 4, 3, integration_vectors.k5k1_out,
+                                               integration_vectors.k5k3_out,
+                                               integration_vectors.k5k4_out);
+    gsl_blas_dscal(h, integration_vectors.k5_in);
+    gsl_vector_add(integration_vectors.k5_in, in_vec);    
     
-    (*f)(x0 + a5*h, k5_in, k5_out);
-
-    //////////////
+    (*f)(x0 + a5*h, integration_vectors.k5_in, integration_vectors.k5_out);
+    //printf("k5: ");
+    //print_vec(integration_vectors.k5_out);
     // k6
     /////////////
-    gsl_vector *k6k1_out = gsl_vector_alloc(4);
-    gsl_vector *k6k4_out = gsl_vector_alloc(4);
-    gsl_vector *k6k5_out = gsl_vector_alloc(4);
-    gsl_vector_memcpy(k6k1_out, k1_out);
-    gsl_vector_memcpy(k6k4_out, k4_out);
-    gsl_vector_memcpy(k6k5_out, k5_out);
-    gsl_blas_dscal(b61, k6k1_out);
-    gsl_blas_dscal(b64, k6k4_out);
-    gsl_blas_dscal(b65, k6k5_out);
-    k6_in = _vect_add(4, 3, k6k1_out,
-                            k6k4_out,
-                            k6k5_out);
-    gsl_blas_dscal(h, k6_in);
-    gsl_vector_add(k6_in, in_vec);    
+    gsl_vector_memcpy(integration_vectors.k6k1_out, integration_vectors.k1_out);
+    gsl_vector_memcpy(integration_vectors.k6k4_out, integration_vectors.k4_out);
+    gsl_vector_memcpy(integration_vectors.k6k5_out, integration_vectors.k5_out);
+    gsl_blas_dscal(b61, integration_vectors.k6k1_out);
+    gsl_blas_dscal(b64, integration_vectors.k6k4_out);
+    gsl_blas_dscal(b65, integration_vectors.k6k5_out);
+    _vect_add(integration_vectors.k6_in, 4, 3, integration_vectors.k6k1_out,
+                                               integration_vectors.k6k4_out,
+                                               integration_vectors.k6k5_out);
+    gsl_blas_dscal(h, integration_vectors.k6_in);
+    gsl_vector_add(integration_vectors.k6_in, in_vec);    
     
-    (*f)(x0 + a6*h, k6_in, k6_out);
-
+    (*f)(x0 + a6*h, integration_vectors.k6_in, integration_vectors.k6_out);
+    //printf("k6: ");
+    //print_vec(integration_vectors.k6_out);
     //////////////
     // k7
     /////////////
-    gsl_vector *k7k1_out = gsl_vector_alloc(4);
-    gsl_vector *k7k4_out = gsl_vector_alloc(4);
-    gsl_vector *k7k5_out = gsl_vector_alloc(4);
-    gsl_vector *k7k6_out = gsl_vector_alloc(4);
-    gsl_vector_memcpy(k7k1_out, k1_out);
-    gsl_vector_memcpy(k7k4_out, k4_out);
-    gsl_vector_memcpy(k7k5_out, k5_out);
-    gsl_vector_memcpy(k7k6_out, k6_out);
-    gsl_blas_dscal(b71, k7k1_out);
-    gsl_blas_dscal(b74, k7k4_out);
-    gsl_blas_dscal(b75, k7k5_out);
-    gsl_blas_dscal(b76, k7k6_out);
-    k7_in = _vect_add(4, 4, k7k1_out,
-                            k7k4_out,
-                            k7k5_out,
-                            k7k6_out);
-    gsl_blas_dscal(h, k7_in);
-    gsl_vector_add(k7_in, in_vec);    
+    gsl_vector_memcpy(integration_vectors.k7k1_out, integration_vectors.k1_out);
+    gsl_vector_memcpy(integration_vectors.k7k4_out, integration_vectors.k4_out);
+    gsl_vector_memcpy(integration_vectors.k7k5_out, integration_vectors.k5_out);
+    gsl_vector_memcpy(integration_vectors.k7k6_out, integration_vectors.k6_out);
+    gsl_blas_dscal(b71, integration_vectors.k7k1_out);
+    gsl_blas_dscal(b74, integration_vectors.k7k4_out);
+    gsl_blas_dscal(b75, integration_vectors.k7k5_out);
+    gsl_blas_dscal(b76, integration_vectors.k7k6_out);
+    _vect_add(integration_vectors.k7_in, 4, 4, integration_vectors.k7k1_out,
+                                               integration_vectors.k7k4_out,
+                                               integration_vectors.k7k5_out,
+                                               integration_vectors.k7k6_out);
+    gsl_blas_dscal(h, integration_vectors.k7_in);
+    gsl_vector_add(integration_vectors.k7_in, in_vec);    
     
-    (*f)(x0 + a7*h, k7_in, k7_out);
-
+    (*f)(x0 + a7*h, integration_vectors.k7_in, integration_vectors.k7_out);
+    //printf("k7: ");
+    //print_vec(integration_vectors.k7_out);
     //////////////
     // k8
     /////////////
-    gsl_vector *k8k1_out = gsl_vector_alloc(4);
-    gsl_vector *k8k5_out = gsl_vector_alloc(4);
-    gsl_vector *k8k6_out = gsl_vector_alloc(4);
-    gsl_vector *k8k7_out = gsl_vector_alloc(4);
-    gsl_vector_memcpy(k8k1_out, k1_out);
-    gsl_vector_memcpy(k8k5_out, k5_out);
-    gsl_vector_memcpy(k8k6_out, k6_out);
-    gsl_vector_memcpy(k8k7_out, k7_out);
-    gsl_blas_dscal(b81, k8k1_out);
-    gsl_blas_dscal(b85, k8k5_out);
-    gsl_blas_dscal(b86, k8k6_out);
-    gsl_blas_dscal(b87, k8k7_out);
-    k8_in = _vect_add(4, 4, k8k1_out,
-                            k8k5_out,
-                            k8k6_out,
-                            k8k7_out);
-    gsl_blas_dscal(h, k8_in);
-    gsl_vector_add(k8_in, in_vec);    
+    gsl_vector_memcpy(integration_vectors.k8k1_out, integration_vectors.k1_out);
+    gsl_vector_memcpy(integration_vectors.k8k5_out, integration_vectors.k5_out);
+    gsl_vector_memcpy(integration_vectors.k8k6_out, integration_vectors.k6_out);
+    gsl_vector_memcpy(integration_vectors.k8k7_out, integration_vectors.k7_out);
+    gsl_blas_dscal(b81, integration_vectors.k8k1_out);
+    gsl_blas_dscal(b85, integration_vectors.k8k5_out);
+    gsl_blas_dscal(b86, integration_vectors.k8k6_out);
+    gsl_blas_dscal(b87, integration_vectors.k8k7_out);
+    _vect_add(integration_vectors.k8_in, 4, 4, integration_vectors.k8k1_out,
+                                               integration_vectors.k8k5_out,
+                                               integration_vectors.k8k6_out,
+                                               integration_vectors.k8k7_out);
+    gsl_blas_dscal(h, integration_vectors.k8_in);
+    gsl_vector_add(integration_vectors.k8_in, in_vec);    
     
-    (*f)(x0 + a8*h, k8_in, k8_out);
+    (*f)(x0 + a8*h, integration_vectors.k8_in, integration_vectors.k8_out);
    
-   
+    //printf("k8: ");
+    //print_vec(integration_vectors.k8_out);   
     //////////////
     // k9
     /////////////
-    gsl_vector *k9k1_out = gsl_vector_alloc(4);
-    gsl_vector *k9k4_out = gsl_vector_alloc(4);
-    gsl_vector *k9k5_out = gsl_vector_alloc(4);
-    gsl_vector *k9k6_out = gsl_vector_alloc(4);
-    gsl_vector *k9k7_out = gsl_vector_alloc(4);
-    gsl_vector *k9k8_out = gsl_vector_alloc(4);
-    gsl_vector_memcpy(k9k1_out, k1_out);
-    gsl_vector_memcpy(k9k4_out, k4_out);
-    gsl_vector_memcpy(k9k5_out, k5_out);
-    gsl_vector_memcpy(k9k6_out, k6_out);
-    gsl_vector_memcpy(k9k7_out, k7_out);
-    gsl_vector_memcpy(k9k8_out, k8_out);
-    gsl_blas_dscal(b91, k9k1_out);
-    gsl_blas_dscal(b94, k9k4_out);
-    gsl_blas_dscal(b95, k9k5_out);
-    gsl_blas_dscal(b96, k9k6_out);
-    gsl_blas_dscal(b97, k9k7_out);
-    gsl_blas_dscal(b98, k9k8_out);
-    k9_in = _vect_add(4, 6, k9k1_out,
-                            k9k4_out,
-                            k9k5_out,
-                            k9k6_out,
-                            k9k7_out,
-                            k9k8_out);
-    gsl_blas_dscal(h, k9_in);
-    gsl_vector_add(k9_in, in_vec);  
-    (*f)(x0 + a9*h, k9_in, k9_out);
-
+    gsl_vector_memcpy(integration_vectors.k9k1_out, integration_vectors.k1_out);
+    gsl_vector_memcpy(integration_vectors.k9k4_out, integration_vectors.k4_out);
+    gsl_vector_memcpy(integration_vectors.k9k5_out, integration_vectors.k5_out);
+    gsl_vector_memcpy(integration_vectors.k9k6_out, integration_vectors.k6_out);
+    gsl_vector_memcpy(integration_vectors.k9k7_out, integration_vectors.k7_out);
+    gsl_vector_memcpy(integration_vectors.k9k8_out, integration_vectors.k8_out);
+    gsl_blas_dscal(b91, integration_vectors.k9k1_out);
+    gsl_blas_dscal(b94, integration_vectors.k9k4_out);
+    gsl_blas_dscal(b95, integration_vectors.k9k5_out);
+    gsl_blas_dscal(b96, integration_vectors.k9k6_out);
+    gsl_blas_dscal(b97, integration_vectors.k9k7_out);
+    gsl_blas_dscal(b98, integration_vectors.k9k8_out);
+    _vect_add(integration_vectors.k9_in, 4, 6, integration_vectors.k9k1_out,
+                                               integration_vectors.k9k4_out,
+                                               integration_vectors.k9k5_out,
+                                               integration_vectors.k9k6_out,
+                                               integration_vectors.k9k7_out,
+                                               integration_vectors.k9k8_out);
+                                               
+    gsl_blas_dscal(h, integration_vectors.k9_in);
+    gsl_vector_add(integration_vectors.k9_in, in_vec);  
+    (*f)(x0 + a9*h, integration_vectors.k9_in, integration_vectors.k9_out);
+    //printf("k9: ");
+    //print_vec(integration_vectors.k9_out);
     //////////////
     // k10
     /////////////
-    gsl_vector *k10k1_out = gsl_vector_alloc(4);
-    gsl_vector *k10k4_out = gsl_vector_alloc(4);
-    gsl_vector *k10k5_out = gsl_vector_alloc(4);
-    gsl_vector *k10k6_out = gsl_vector_alloc(4);
-    gsl_vector *k10k7_out = gsl_vector_alloc(4);
-    gsl_vector *k10k8_out = gsl_vector_alloc(4);
-    gsl_vector *k10k9_out = gsl_vector_alloc(4);
-    gsl_vector_memcpy(k10k1_out, k1_out);
-    gsl_vector_memcpy(k10k4_out, k4_out);
-    gsl_vector_memcpy(k10k5_out, k5_out);
-    gsl_vector_memcpy(k10k6_out, k6_out);
-    gsl_vector_memcpy(k10k7_out, k7_out);
-    gsl_vector_memcpy(k10k8_out, k8_out);
-    gsl_vector_memcpy(k10k9_out, k9_out);
-    gsl_blas_dscal(b10_1, k10k1_out);
-    gsl_blas_dscal(b10_4, k10k4_out);
-    gsl_blas_dscal(b10_5, k10k5_out);
-    gsl_blas_dscal(b10_6, k10k6_out);
-    gsl_blas_dscal(b10_7, k10k7_out);
-    gsl_blas_dscal(b10_8, k10k8_out);
-    gsl_blas_dscal(b10_9, k10k9_out);
-    k10_in = _vect_add(4, 7, k10k1_out,
-                             k10k4_out,
-                             k10k5_out,
-                             k10k6_out,
-                             k10k7_out,
-                             k10k8_out,
-                             k10k9_out);
-    gsl_blas_dscal(h, k10_in);
-    gsl_vector_add(k10_in, in_vec);  
-    (*f)(x0 + a10*h, k10_in, k10_out);
-
+    gsl_vector_memcpy(integration_vectors.k10k1_out, integration_vectors.k1_out);
+    gsl_vector_memcpy(integration_vectors.k10k4_out, integration_vectors.k4_out);
+    gsl_vector_memcpy(integration_vectors.k10k5_out, integration_vectors.k5_out);
+    gsl_vector_memcpy(integration_vectors.k10k6_out, integration_vectors.k6_out);
+    gsl_vector_memcpy(integration_vectors.k10k7_out, integration_vectors.k7_out);
+    gsl_vector_memcpy(integration_vectors.k10k8_out, integration_vectors.k8_out);
+    gsl_vector_memcpy(integration_vectors.k10k9_out, integration_vectors.k9_out);
+    gsl_blas_dscal(b10_1, integration_vectors.k10k1_out);
+    gsl_blas_dscal(b10_4, integration_vectors.k10k4_out);
+    gsl_blas_dscal(b10_5, integration_vectors.k10k5_out);
+    gsl_blas_dscal(b10_6, integration_vectors.k10k6_out);
+    gsl_blas_dscal(b10_7, integration_vectors.k10k7_out);
+    gsl_blas_dscal(b10_8, integration_vectors.k10k8_out);
+    gsl_blas_dscal(b10_9, integration_vectors.k10k9_out);
+    _vect_add(integration_vectors.k10_in, 4, 7, integration_vectors.k10k1_out,
+                                                integration_vectors.k10k4_out,
+                                                integration_vectors.k10k5_out,
+                                                integration_vectors.k10k6_out,
+                                                integration_vectors.k10k7_out,
+                                                integration_vectors.k10k8_out,
+                                                integration_vectors.k10k9_out);
+    gsl_blas_dscal(h, integration_vectors.k10_in);
+    gsl_vector_add(integration_vectors.k10_in, in_vec);  
+    (*f)(x0 + a10*h, integration_vectors.k10_in, integration_vectors.k10_out);
+    //printf("k10: ");
+    //print_vec(integration_vectors.k10_out);
     //////////////
     // k11
     /////////////
-    gsl_vector *k11k1_out = gsl_vector_alloc(4);
-    gsl_vector *k11k4_out = gsl_vector_alloc(4);
-    gsl_vector *k11k5_out = gsl_vector_alloc(4);
-    gsl_vector *k11k6_out = gsl_vector_alloc(4);
-    gsl_vector *k11k7_out = gsl_vector_alloc(4);
-    gsl_vector *k11k8_out = gsl_vector_alloc(4);
-    gsl_vector *k11k9_out = gsl_vector_alloc(4);
-    gsl_vector *k11k10_out = gsl_vector_alloc(4);
-    gsl_vector_memcpy(k11k1_out, k1_out);
-    gsl_vector_memcpy(k11k4_out, k4_out);
-    gsl_vector_memcpy(k11k5_out, k5_out);
-    gsl_vector_memcpy(k11k6_out, k6_out);
-    gsl_vector_memcpy(k11k7_out, k7_out);
-    gsl_vector_memcpy(k11k8_out, k8_out);
-    gsl_vector_memcpy(k11k9_out, k9_out);
-    gsl_vector_memcpy(k11k10_out, k10_out);
-    gsl_blas_dscal(b11_1, k11k1_out);
-    gsl_blas_dscal(b11_4, k11k4_out);
-    gsl_blas_dscal(b11_5, k11k5_out);
-    gsl_blas_dscal(b11_6, k11k6_out);
-    gsl_blas_dscal(b11_7, k11k7_out);
-    gsl_blas_dscal(b11_8, k11k8_out);
-    gsl_blas_dscal(b11_9, k11k9_out);
-    gsl_blas_dscal(b11_10, k11k10_out);
-    k11_in = _vect_add(4, 8, k11k1_out,
-                             k11k4_out,
-                             k11k5_out,
-                             k11k6_out,
-                             k11k7_out,
-                             k11k8_out,
-                             k11k9_out,
-                             k11k10_out);
-    gsl_blas_dscal(h, k11_in);
-    gsl_vector_add(k11_in, in_vec);  
-    (*f)(x0 + h, k11_in, k11_out);
-
+    gsl_vector_memcpy(integration_vectors.k11k1_out, integration_vectors.k1_out);
+    gsl_vector_memcpy(integration_vectors.k11k4_out, integration_vectors.k4_out);
+    gsl_vector_memcpy(integration_vectors.k11k5_out, integration_vectors.k5_out);
+    gsl_vector_memcpy(integration_vectors.k11k6_out, integration_vectors.k6_out);
+    gsl_vector_memcpy(integration_vectors.k11k7_out, integration_vectors.k7_out);
+    gsl_vector_memcpy(integration_vectors.k11k8_out, integration_vectors.k8_out);
+    gsl_vector_memcpy(integration_vectors.k11k9_out, integration_vectors.k9_out);
+    gsl_vector_memcpy(integration_vectors.k11k10_out, integration_vectors.k10_out);
+    gsl_blas_dscal(b11_1, integration_vectors.k11k1_out);
+    gsl_blas_dscal(b11_4, integration_vectors.k11k4_out);
+    gsl_blas_dscal(b11_5, integration_vectors.k11k5_out);
+    gsl_blas_dscal(b11_6, integration_vectors.k11k6_out);
+    gsl_blas_dscal(b11_7, integration_vectors.k11k7_out);
+    gsl_blas_dscal(b11_8, integration_vectors.k11k8_out);
+    gsl_blas_dscal(b11_9, integration_vectors.k11k9_out);
+    gsl_blas_dscal(b11_10, integration_vectors.k11k10_out);
+    _vect_add(integration_vectors.k11_in, 4, 8, integration_vectors.k11k1_out,
+                                                integration_vectors.k11k4_out,
+                                                integration_vectors.k11k5_out,
+                                                integration_vectors.k11k6_out,
+                                                integration_vectors.k11k7_out,
+                                                integration_vectors.k11k8_out,
+                                                integration_vectors.k11k9_out,
+                                                integration_vectors.k11k10_out);
+    gsl_blas_dscal(h, integration_vectors.k11_in);
+    gsl_vector_add(integration_vectors.k11_in, in_vec);  
+    (*f)(x0 + h, integration_vectors.k11_in, integration_vectors.k11_out);
+    //printf("k11: ");
+    //print_vec(integration_vectors.k11_out);
     //////////////
     // k12
     /////////////
-    gsl_vector *k12k1_out = gsl_vector_alloc(4);
-    gsl_vector *k12k6_out = gsl_vector_alloc(4);
-    gsl_vector *k12k7_out = gsl_vector_alloc(4);
-    gsl_vector *k12k8_out = gsl_vector_alloc(4);
-    gsl_vector *k12k9_out = gsl_vector_alloc(4);
-    gsl_vector *k12k10_out = gsl_vector_alloc(4);
-    gsl_vector_memcpy(k12k1_out, k1_out);
-    gsl_vector_memcpy(k12k6_out, k6_out);
-    gsl_vector_memcpy(k12k7_out, k7_out);
-    gsl_vector_memcpy(k12k8_out, k8_out);
-    gsl_vector_memcpy(k12k9_out, k9_out);
-    gsl_vector_memcpy(k12k10_out, k10_out);
-    gsl_blas_dscal(b12_1, k12k1_out);
-    gsl_blas_dscal(b12_6, k12k6_out);
-    gsl_blas_dscal(b12_7, k12k7_out);
-    gsl_blas_dscal(b12_8, k12k8_out);
-    gsl_blas_dscal(b12_9, k12k9_out);
-    gsl_blas_dscal(b12_10, k12k10_out);
-    k12_in = _vect_add(4, 6, k12k1_out,
-                             k12k6_out,
-                             k12k7_out,
-                             k12k8_out,
-                             k12k9_out,
-                             k12k10_out);
-    gsl_blas_dscal(h, k12_in);
-    gsl_vector_add(k12_in, in_vec); 
+    gsl_vector_memcpy(integration_vectors.k12k1_out, integration_vectors.k1_out);
+    gsl_vector_memcpy(integration_vectors.k12k6_out, integration_vectors.k6_out);
+    gsl_vector_memcpy(integration_vectors.k12k7_out, integration_vectors.k7_out);
+    gsl_vector_memcpy(integration_vectors.k12k8_out, integration_vectors.k8_out);
+    gsl_vector_memcpy(integration_vectors.k12k9_out, integration_vectors.k9_out);
+    gsl_vector_memcpy(integration_vectors.k12k10_out, integration_vectors.k10_out);
+    gsl_blas_dscal(b12_1, integration_vectors.k12k1_out);
+    gsl_blas_dscal(b12_6, integration_vectors.k12k6_out);
+    gsl_blas_dscal(b12_7, integration_vectors.k12k7_out);
+    gsl_blas_dscal(b12_8, integration_vectors.k12k8_out);
+    gsl_blas_dscal(b12_9, integration_vectors.k12k9_out);
+    gsl_blas_dscal(b12_10, integration_vectors.k12k10_out);
+    _vect_add(integration_vectors.k12_in, 4, 6, integration_vectors.k12k1_out,
+                                                integration_vectors.k12k6_out,
+                                                integration_vectors.k12k7_out,
+                                                integration_vectors.k12k8_out,
+                                                integration_vectors.k12k9_out,
+                                                integration_vectors.k12k10_out);
+    gsl_blas_dscal(h, integration_vectors.k12_in);
+    gsl_vector_add(integration_vectors.k12_in, in_vec); 
                            
-    (*f)(x0, k12_in, k12_out);
-
+    (*f)(x0, integration_vectors.k12_in, integration_vectors.k12_out);
+    //printf("k12: ");
+    //print_vec(integration_vectors.k12_out);
     //////////////
     // k13
     /////////////
-    gsl_vector *k13k1_out = gsl_vector_alloc(4);
-    gsl_vector *k13k4_out = gsl_vector_alloc(4);
-    gsl_vector *k13k5_out = gsl_vector_alloc(4);
-    gsl_vector *k13k6_out = gsl_vector_alloc(4);
-    gsl_vector *k13k7_out = gsl_vector_alloc(4);
-    gsl_vector *k13k8_out = gsl_vector_alloc(4);
-    gsl_vector *k13k9_out = gsl_vector_alloc(4);
-    gsl_vector *k13k10_out = gsl_vector_alloc(4);
-    gsl_vector *k13k12_out = gsl_vector_alloc(4);
-    gsl_vector_memcpy(k13k1_out, k1_out);
-    gsl_vector_memcpy(k13k4_out, k4_out);
-    gsl_vector_memcpy(k13k5_out, k5_out);
-    gsl_vector_memcpy(k13k6_out, k6_out);
-    gsl_vector_memcpy(k13k7_out, k7_out);
-    gsl_vector_memcpy(k13k8_out, k8_out);
-    gsl_vector_memcpy(k13k9_out, k9_out);
-    gsl_vector_memcpy(k13k10_out, k10_out);
-    gsl_vector_memcpy(k13k12_out, k12_out);
-    gsl_blas_dscal(b13_1, k13k1_out);
-    gsl_blas_dscal(b13_4, k13k4_out);
-    gsl_blas_dscal(b13_5, k13k5_out);
-    gsl_blas_dscal(b13_6, k13k6_out);
-    gsl_blas_dscal(b13_7, k13k7_out);
-    gsl_blas_dscal(b13_8, k13k8_out);
-    gsl_blas_dscal(b13_9, k13k9_out);
-    gsl_blas_dscal(b13_10, k13k10_out);
-    k13_in = _vect_add(4, 9, k13k1_out,
-                             k13k4_out,
-                             k13k5_out,
-                             k13k6_out,
-                             k13k7_out,
-                             k13k8_out,
-                             k13k9_out,
-                             k13k10_out,
-                             k13k12_out);
-    gsl_blas_dscal(h, k13_in);
-    gsl_vector_add(k13_in, in_vec); 
+    gsl_vector_memcpy(integration_vectors.k13k1_out, integration_vectors.k1_out);
+    gsl_vector_memcpy(integration_vectors.k13k4_out, integration_vectors.k4_out);
+    gsl_vector_memcpy(integration_vectors.k13k5_out, integration_vectors.k5_out);
+    gsl_vector_memcpy(integration_vectors.k13k6_out, integration_vectors.k6_out);
+    gsl_vector_memcpy(integration_vectors.k13k7_out, integration_vectors.k7_out);
+    gsl_vector_memcpy(integration_vectors.k13k8_out, integration_vectors.k8_out);
+    gsl_vector_memcpy(integration_vectors.k13k9_out, integration_vectors.k9_out);
+    gsl_vector_memcpy(integration_vectors.k13k10_out, integration_vectors.k10_out);
+    gsl_vector_memcpy(integration_vectors.k13k12_out, integration_vectors.k12_out);
+    gsl_blas_dscal(b13_1, integration_vectors.k13k1_out);
+    gsl_blas_dscal(b13_4, integration_vectors.k13k4_out);
+    gsl_blas_dscal(b13_5, integration_vectors.k13k5_out);
+    gsl_blas_dscal(b13_6, integration_vectors.k13k6_out);
+    gsl_blas_dscal(b13_7, integration_vectors.k13k7_out);
+    gsl_blas_dscal(b13_8, integration_vectors.k13k8_out);
+    gsl_blas_dscal(b13_9, integration_vectors.k13k9_out);
+    gsl_blas_dscal(b13_10, integration_vectors.k13k10_out);
+    _vect_add(integration_vectors.k13_in, 4, 9, integration_vectors.k13k1_out,
+                                                integration_vectors.k13k4_out,
+                                                integration_vectors.k13k5_out,
+                                                integration_vectors.k13k6_out,
+                                                integration_vectors.k13k7_out,
+                                                integration_vectors.k13k8_out,
+                                                integration_vectors.k13k9_out,
+                                                integration_vectors.k13k10_out,
+                                                integration_vectors.k13k12_out);
+    gsl_blas_dscal(h, integration_vectors.k13_in);
+    gsl_vector_add(integration_vectors.k13_in, in_vec); 
                            
-    (*f)(x0, k13_in, k13_out);                             
-    
+    (*f)(x0, integration_vectors.k13_in, integration_vectors.k13_out);                             
+    //printf("k13: ");
+    //print_vec(integration_vectors.k13_out);    
     //////////////
     // out_vec
     /////////////
-    gsl_vector *c_1_11_vec = gsl_vector_alloc(4);
-    gsl_vector *c_6_vec = gsl_vector_alloc(4);
-    gsl_vector *c_7_8_vec = gsl_vector_alloc(4);
-    gsl_vector *c_9_10_vec = gsl_vector_alloc(4);
-    gsl_vector *c_tot_vec = gsl_vector_alloc(4);
+    _vect_add(integration_vectors.c_1_11_vec, 4, 2, integration_vectors.k1_out,
+                                                    integration_vectors.k11_out);
+    gsl_vector_memcpy(integration_vectors.c_6_vec, integration_vectors.k6_out);
+    _vect_add(integration_vectors.c_7_8_vec, 4, 2, integration_vectors.k7_out,
+                                                   integration_vectors.k8_out);
+    _vect_add(integration_vectors.c_9_10_vec, 4, 2, integration_vectors.k9_out,
+                                                    integration_vectors.k10_out);
+    gsl_blas_dscal(c_1_11, integration_vectors.c_1_11_vec);
+    gsl_blas_dscal(c6, integration_vectors.c_6_vec);
+    gsl_blas_dscal(c_7_8, integration_vectors.c_7_8_vec);
+    gsl_blas_dscal(c_9_10, integration_vectors.c_9_10_vec);
+    _vect_add(integration_vectors.c_tot_vec, 4, 4, integration_vectors.c_1_11_vec,
+                                                   integration_vectors.c_6_vec,
+                                                   integration_vectors.c_7_8_vec,
+                                                   integration_vectors.c_9_10_vec);
     
-    c_1_11_vec = _vect_add(4, 2, k1_out, k11_out);
-    gsl_vector_memcpy(c_6_vec, k6_out);
-    c_7_8_vec = _vect_add(4, 2, k7_out, k8_out);
-    c_9_10_vec = _vect_add(4, 2, k9_out, k10_out);
-    gsl_blas_dscal(c_1_11, c_1_11_vec);
-    gsl_blas_dscal(c6, c_6_vec);
-    gsl_blas_dscal(c_7_8, c_7_8_vec);
-    gsl_blas_dscal(c_9_10, c_9_10_vec);
-    c_tot_vec = _vect_add(4, 4, c_1_11_vec,
-                                c_6_vec,
-                                c_7_8_vec,
-                                c_9_10_vec);
-    
-    gsl_blas_dscal(h, c_tot_vec);
-    gsl_vector_add(c_tot_vec, in_vec);
-    gsl_vector_memcpy(out_vec, c_tot_vec);
-    
+    gsl_blas_dscal(h, integration_vectors.c_tot_vec);
+    gsl_vector_add(integration_vectors.c_tot_vec, in_vec);
+    gsl_vector_memcpy(out_vec, integration_vectors.c_tot_vec);
+    //printf("single_step out_vec: ");
+    //print_vec(out_vec);
     //////////////
     // err_factor
     /////////////
-    gsl_vector *err_vec = gsl_vector_alloc(4);
-    gsl_vector *ek12 = gsl_vector_alloc(4);
-    gsl_vector *ek13 = gsl_vector_alloc(4);
+    gsl_vector_memcpy(integration_vectors.ek12, integration_vectors.k12_out);
+    gsl_vector_memcpy(integration_vectors.ek13, integration_vectors.k13_out);
+    gsl_blas_dscal(-1, integration_vectors.ek12);
+    gsl_blas_dscal(-1, integration_vectors.ek13);
     
-    gsl_vector_memcpy(ek12, k12_out);
-    gsl_vector_memcpy(ek13, k13_out);
-    gsl_blas_dscal(-1, ek12);
-    gsl_blas_dscal(-1, ek13);
-    
-    err_vec = _vect_add(4, 4, k1_out, k11_out, ek12, ek13);   
-    
+    _vect_add(integration_vectors.err_vec, 4, 4, integration_vectors.k1_out,
+                                                 integration_vectors.k11_out,
+                                                 integration_vectors.ek12,
+                                                 integration_vectors.ek13);   
     
     
     
-    return err_factor * gsl_blas_dnrm2(err_vec);
+    
+    return err_factor * gsl_blas_dnrm2(integration_vectors.err_vec);
 }
 
 
@@ -761,10 +878,9 @@ int double_pendulum_eom(double t, gsl_vector *in_state, gsl_vector *out_state){
 // returns:
 //        o the vector sum of the inputs (gsl_vector)
 /////////////////////////////////////////////////////
-gsl_vector *_vect_add(int vect_len, int count, ...){
+int *_vect_add(gsl_vector * sum, int vect_len, int count, ...){
     va_list p;
     int i;
-    gsl_vector *sum = gsl_vector_alloc(vect_len);
     gsl_vector *tmp_vec; 
     va_start(p, count);
     
@@ -773,7 +889,7 @@ gsl_vector *_vect_add(int vect_len, int count, ...){
         gsl_blas_daxpy(1, tmp_vec, sum);
     }   
     va_end(p);
-    return(sum);
+    return 0;
 }
 
 int _populate_history(int hist_len,
