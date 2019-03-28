@@ -7,6 +7,7 @@ alexanderdeich@montana.edu
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <math.h>
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_blas.h>
@@ -20,6 +21,12 @@ alexanderdeich@montana.edu
 #define MAX_SCALE_FACTOR 4.
 
 #define GRAVITY 9.8
+
+/* poincare section flags and condition */
+int make_section;
+double poincare_condition[2];
+double poincare_tolerance;
+int poincare_yes = 0;
 
 /* declaring all the helper functions, defined below the heavy-lifting integration code */
 static int stepper(double (*f) (double, gsl_vector *, gsl_vector *),
@@ -36,6 +43,7 @@ static int arr2vec(int len, double in_arr[len], gsl_vector * out_vec);
 static void integration_vector_init();
 static void integration_vector_free();
 static void print_vec(gsl_vector * vec);
+static void poincare_check(gsl_vector * state);
 
 /* declaring the integration vector struct*/
 static struct {
@@ -171,7 +179,8 @@ int rkf78(double (*f) (double, gsl_vector *, gsl_vector *),
 	  double xmin,
 	  double xmax,
 	  double init_state[4],
-	  int hist_len, double history[hist_len][5], double tol, double h)
+	  int hist_len, double history[hist_len][5], double tol, double h,
+	  _Bool init_make_section, double init_poincare_condition[2], double init_poincare_tolerance)
 {
 
     double stepsize = (xmax - xmin) / hist_len;
@@ -179,7 +188,16 @@ int rkf78(double (*f) (double, gsl_vector *, gsl_vector *),
 
     double x1 = xmin;
     double x2 = xmin + stepsize;
-
+    
+    make_section = init_make_section;
+    poincare_condition[0] = init_poincare_condition[0];
+    poincare_condition[1] = init_poincare_condition[1];
+    poincare_tolerance = init_poincare_tolerance;
+    
+    _Bool add_to_history = 1;
+    if(make_section){
+        add_to_history = 0;
+    }
     /* initialize initial state */
     gsl_vector *init_state_vec = gsl_vector_calloc(4);
     /* load the array from python into the gsl_vector */
@@ -190,17 +208,33 @@ int rkf78(double (*f) (double, gsl_vector *, gsl_vector *),
 
     /* step through all the times */
     for (int i = 0; i < hist_len; i++) {
-	stepper(f, init_state_vec, out_state_vec, x1, h, x2, &hpt, tol);
-	populate_history(hist_len, history, i, x2, out_state_vec);
-	x1 = x2;
-	x2 += stepsize;
-	gsl_vector_memcpy(init_state_vec, out_state_vec);
+	    
+	    stepper(f, init_state_vec, out_state_vec, x1, h, x2, &hpt, tol);
+        
+        if (make_section){
+            poincare_check(out_state_vec);
+            if (poincare_yes){
+                add_to_history = 1;
+            }
+        }
+
+        
+        if (add_to_history){
+	        populate_history(hist_len, history, i, x2, out_state_vec);
+	        if(make_section){
+	            add_to_history = 0;
+	            poincare_yes = 0;
+	            }
+	        }
+	    x1 = x2;
+	    x2 += stepsize;
+	    gsl_vector_memcpy(init_state_vec, out_state_vec);
 
     }
 
     return 0;
 }
-
+ 
 /////////////////////
 // stepper steps the state from one timestamp to another.  It makes sure that the error
 // in the final state is less than a given tolerance.
@@ -943,9 +977,21 @@ static int populate_history(int hist_len,
 {
     history[step][0] = clock;
     for (int i = 1; i < 5; i++) {
-	history[step][i] = gsl_vector_get(state, i - 1);
+	    history[step][i] = gsl_vector_get(state, i - 1);
     }
     return 0;
+}
+
+static void poincare_check(gsl_vector * state){
+    /* the first if checks to see if Th1 is within the tolerance of the desired Th1 */
+    if (fabs(gsl_vector_get(state, 0) - poincare_condition[0]) < poincare_tolerance){
+    
+        /* the second checks to see if Th1_d and the desired Th1_d are on the 
+        same side of 0 */
+        if ((gsl_vector_get(state, 1) / poincare_condition[1]) > 0){
+            poincare_yes = 1;
+        }
+    }
 }
 
 /////////////////
